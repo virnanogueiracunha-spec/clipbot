@@ -1,0 +1,6 @@
+downloads/
+static/clips/
+__pycache__/
+*.pyc
+.env
+*.mp4

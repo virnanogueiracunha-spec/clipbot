@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClipBot — Gere clips virais automaticamente</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --orange: #ff6a00;
+    --cyan: #00e5ff;
+    --pink: #ff2d78;
+    --yellow: #ffe234;
+    --bg: #07070f;
+    --bg2: #0d0d1a;
+    --border: rgba(255,255,255,0.08);
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* SCANLINES overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* NAV */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 40px;
+    border-bottom: 1px solid rgba(255,106,0,0.2);
+    background: rgba(7,7,15,0.95);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 3px;
+    background: linear-gradient(90deg, var(--orange), var(--yellow));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .stars {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .star {
+    width: 18px;
+    height: 18px;
+    background: var(--yellow);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    opacity: 0.3;
+    transition: opacity 0.3s;
+  }
+  .star.active { opacity: 1; }
+
+  /* HERO WRAPPER */
+  .hero-wrapper {
+    display: grid;
+    grid-template-columns: 180px 1fr 180px;
+    gap: 0;
+    min-height: 600px;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  @media (max-width: 860px) {
+    .hero-wrapper { grid-template-columns: 1fr; }
+    .img-col { display: none; }
+  }
+
+  /* IMAGE COLUMNS */
+  .img-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px 10px;
+    height: 640px;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  }
+
+  .img-col.left { animation: scrollUp 20s linear infinite; }
+  .img-col.right { animation: scrollDown 24s linear infinite; }
+
+  @keyframes scrollUp {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-50%); }
+  }
+  @keyframes scrollDown {
+    0% { transform: translateY(-50%); }
+    100% { transform: translateY(0); }
+  }
+
+  .img-col img {
+    width: 100%;
+    border-radius: 8px;
+    object-fit: cover;
+    aspect-ratio: 2/3;
+    display: block;
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: transform 0.3s;
+  }
+  .img-col img:hover {
+    transform: scale(1.03);
+    border-color: rgba(255,106,0,0.4);
+  }
+
+  /* HERO */
+  .hero {
+    text-align: center;
+    padding: 60px 20px 40px;
+    position: relative;
+  }
+
+  .hero-bg {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 50% at 50% 30%, rgba(255,106,0,0.07) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .hero-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,106,0,0.1);
+    border: 1px solid rgba(255,106,0,0.35);
+    color: var(--orange);
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(52px, 10vw, 100px);
+    line-height: 0.95;
+    letter-spacing: 4px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+
+  h1 .line1 { color: #fff; }
+  h1 .line2 {
+    background: linear-gradient(90deg, var(--orange) 0%, var(--yellow) 40%, var(--pink) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: block;
+  }
+
+  .subtitle {
+    color: #7a7a9a;
+    font-size: 15px;
+    max-width: 420px;
+    margin: 0 auto 44px;
+    line-height: 1.6;
+  }
+
+  /* CARD */
+  .card {
+    background: rgba(13,13,26,0.9);
+    border: 1px solid rgba(255,106,0,0.2);
+    border-radius: 4px;
+    padding: 28px;
+    max-width: 620px;
+    margin: 0 auto;
+    position: relative;
+    box-shadow: 0 0 60px rgba(255,106,0,0.07), 0 0 120px rgba(255,45,120,0.04);
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--orange), var(--yellow), var(--pink));
+  }
+
+  .input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .input-group input {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    padding: 13px 16px;
+    color: #fff;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .input-group input:focus {
+    border-color: rgba(255,106,0,0.5);
+    box-shadow: 0 0 0 3px rgba(255,106,0,0.08);
+  }
+  .input-group input::placeholder { color: #3a3a5a; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--orange), #ff9500);
+    border: none;
+    border-radius: 4px;
+    padding: 13px 22px;
+    color: #000;
+    font-size: 13px;
+    font-weight: 900;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+    box-shadow: 0 0 20px rgba(255,106,0,0.3);
+  }
+  .btn-primary:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 0 30px rgba(255,106,0,0.5);
+  }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .settings {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 6px;
+  }
+  .setting-item { flex: 1; }
+  .setting-item label {
+    display: block;
+    font-size: 10px;
+    color: #4a4a6a;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 7px;
+  }
+  .setting-item select {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 10px 12px;
+    color: #ccc;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    transition: border-color 0.2s;
+  }
+  .setting-item select:focus { border-color: rgba(255,106,0,0.4); }
+
+  /* PROGRESS */
+  #progress-section { display: none; margin-top: 22px; }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #5a5a7a;
+    margin-bottom: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .progress-label #status-text { color: var(--orange); }
+  .progress-bar-wrap {
+    background: rgba(255,255,255,0.05);
+    border-radius: 2px;
+    height: 4px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--orange), var(--yellow));
+    border-radius: 2px;
+    transition: width 0.5s ease;
+    width: 0%;
+    box-shadow: 0 0 10px rgba(255,106,0,0.6);
+  }
+
+  /* RESULTS */
+  #results-section { display: none; margin-top: 28px; }
+  .results-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #4a4a6a;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 14px;
+  }
+  .clips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .clip-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 4px;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+  .clip-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255,106,0,0.4);
+    box-shadow: 0 8px 30px rgba(255,106,0,0.15);
+  }
+  .clip-preview {
+    width: 100%;
+    aspect-ratio: 9/16;
+    object-fit: cover;
+    display: block;
+    background: #0d0d1a;
+  }
+  .clip-info { padding: 10px 11px; }
+  .clip-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    color: var(--orange);
+    margin-bottom: 7px;
+  }
+  .btn-download {
+    display: block;
+    width: 100%;
+    background: rgba(255,106,0,0.1);
+    border: 1px solid rgba(255,106,0,0.3);
+    border-radius: 3px;
+    padding: 7px;
+    color: var(--orange);
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .btn-download:hover {
+    background: rgba(255,106,0,0.2);
+    box-shadow: 0 0 15px rgba(255,106,0,0.2);
+  }
+
+  /* ERROR */
+  .error-box {
+    display: none;
+    background: rgba(255,45,120,0.08);
+    border: 1px solid rgba(255,45,120,0.3);
+    border-radius: 4px;
+    padding: 12px 16px;
+    color: #ff8aaa;
+    font-size: 13px;
+    margin-top: 14px;
+  }
+
+  /* DIVIDER */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    max-width: 620px;
+    margin: 44px auto 0;
+    padding: 0 20px;
+  }
+  .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+  .divider-text { font-size: 10px; color: #3a3a5a; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+
+  /* STATS */
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    max-width: 620px;
+    margin: 24px auto 0;
+    padding: 0 20px;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .stat {
+    flex: 1;
+    text-align: center;
+    padding: 20px 10px;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    background: rgba(13,13,26,0.5);
+  }
+  .stat:last-child { border-right: none; }
+  .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, var(--orange), var(--yellow));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .stat-label { font-size: 11px; color: #4a4a6a; margin-top: 5px; font-weight: 600; letter-spacing: 0.5px; }
+
+  /* STEPS */
+  .steps {
+    max-width: 620px;
+    margin: 24px auto 60px;
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(13,13,26,0.5);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    padding: 14px 18px;
+    transition: border-color 0.2s;
+  }
+  .step:hover { border-color: rgba(255,106,0,0.2); }
+  .step-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 1px;
+    color: var(--orange);
+    min-width: 24px;
+    text-align: center;
+  }
+  .step-text { font-size: 13px; color: #6a6a8a; line-height: 1.5; }
+  .step-text strong { color: #ccc; }
+
+  /* PRICING */
+  .pricing-section {
+    max-width: 900px;
+    margin: 0 auto 60px;
+    padding: 0 20px;
+  }
+  .pricing-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .pricing-header h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    letter-spacing: 3px;
+    line-height: 1;
+  }
+  .pricing-header h2 span {
+    background: linear-gradient(90deg, var(--orange), var(--yellow));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .pricing-header p {
+    color: #5a5a7a;
+    font-size: 14px;
+    margin-top: 8px;
+  }
+
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 700px) {
+    .pricing-grid { grid-template-columns: 1fr; }
+  }
+
+  .plan {
+    background: rgba(13,13,26,0.9);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 28px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .plan:hover {
+    border-color: rgba(255,106,0,0.3);
+    box-shadow: 0 0 40px rgba(255,106,0,0.08);
+  }
+  .plan.popular {
+    border-color: rgba(255,106,0,0.4);
+    box-shadow: 0 0 40px rgba(255,106,0,0.1);
+  }
+  .plan.popular::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--orange), var(--yellow));
+  }
+
+  .popular-badge {
+    position: absolute;
+    top: -1px; right: 20px;
+    background: linear-gradient(135deg, var(--orange), #ff9500);
+    color: #000;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 0 0 6px 6px;
+  }
+
+  .plan-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    color: #6a6a8a;
+  }
+  .plan-price {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    line-height: 1;
+  }
+  .plan-price .currency {
+    font-size: 16px;
+    font-weight: 700;
+    color: #9a9aba;
+    padding-bottom: 4px;
+  }
+  .plan-price .amount {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--orange), var(--yellow));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .plan-price .period {
+    font-size: 12px;
+    color: #4a4a6a;
+    padding-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .plan-desc {
+    font-size: 12px;
+    color: #4a4a6a;
+    line-height: 1.5;
+    margin-top: -12px;
+  }
+
+  .plan-features {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+  }
+  .feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #8a8aaa;
+  }
+  .feature .check {
+    width: 16px;
+    height: 16px;
+    background: rgba(255,106,0,0.15);
+    border: 1px solid rgba(255,106,0,0.3);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--orange);
+    flex-shrink: 0;
+  }
+
+  .btn-plan {
+    display: block;
+    width: 100%;
+    border-radius: 4px;
+    padding: 13px;
+    font-size: 12px;
+    font-weight: 900;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-decoration: none;
+    text-align: center;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+  .btn-plan.outline {
+    background: transparent;
+    border: 1px solid rgba(255,106,0,0.3);
+    color: var(--orange);
+  }
+  .btn-plan.outline:hover { background: rgba(255,106,0,0.1); }
+  .btn-plan.filled {
+    background: linear-gradient(135deg, var(--orange), #ff9500);
+    color: #000;
+    box-shadow: 0 0 20px rgba(255,106,0,0.3);
+  }
+  .btn-plan.filled:hover { box-shadow: 0 0 35px rgba(255,106,0,0.5); transform: translateY(-1px); }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 20px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    font-size: 11px;
+    color: #2a2a4a;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">⚡ ClipBot</div>
+  <div class="stars">
+    <div class="star active"></div>
+    <div class="star active"></div>
+    <div class="star active"></div>
+    <div class="star active"></div>
+    <div class="star active"></div>
+  </div>
+</nav>
+
+<div class="hero-bg"></div>
+<div class="hero-wrapper">
+
+  <!-- LEFT COLUMN -->
+  <div class="img-col left">
+    <img src="/static/hero.jpg" alt="">
+    <img src="/static/gta3.jpg" alt="">
+    <img src="/static/gta5.jpg" alt="">
+    <img src="/static/gta4.jpg" alt="">
+    <img src="/static/gta2.jpg" alt="">
+    <!-- repeat for seamless loop -->
+    <img src="/static/hero.jpg" alt="">
+    <img src="/static/gta3.jpg" alt="">
+    <img src="/static/gta5.jpg" alt="">
+  </div>
+
+  <!-- CENTER: HERO -->
+  <div class="hero">
+  <div class="hero-tag">🎮 Clips virais automáticos</div>
+  <h1>
+    <span class="line1">GERA CLIPS</span>
+    <span class="line2">E FAZ DINHEIRO</span>
+  </h1>
+  <p class="subtitle">Cole um link do YouTube e receba clips 9:16 prontos para postar e monetizar no Shorts, Reels e TikTok.</p>
+
+  <div class="card">
+    <div class="input-group">
+      <input type="text" id="url-input" placeholder="https://youtube.com/watch?v=..." />
+      <button class="btn-primary" id="btn-gerar" onclick="gerarClips()">⚡ GERAR</button>
+    </div>
+
+    <div class="settings">
+      <div class="setting-item">
+        <label>Número de clips</label>
+        <select id="num-clips">
+          <option value="1">1 clip</option>
+          <option value="2">2 clips</option>
+          <option value="3" selected>3 clips</option>
+          <option value="5">5 clips</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label>Duração de cada clip</label>
+        <select id="clip-duration">
+          <option value="10">10 segundos</option>
+          <option value="15" selected>15 segundos</option>
+          <option value="20">20 segundos</option>
+          <option value="30">30 segundos</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="progress-section">
+      <div class="progress-label">
+        <span id="status-text">Processando...</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+    </div>
+
+    <div class="error-box" id="error-box"></div>
+
+    <div id="results-section">
+      <div class="results-title">🎬 Clips prontos para download</div>
+      <div class="clips-grid" id="clips-grid"></div>
+    </div>
+  </div>
+  </div><!-- end .hero -->
+
+  <!-- RIGHT COLUMN -->
+  <div class="img-col right">
+    <img src="/static/gta2.jpg" alt="">
+    <img src="/static/gta4.jpg" alt="">
+    <img src="/static/gta5.jpg" alt="">
+    <img src="/static/hero.jpg" alt="">
+    <img src="/static/gta3.jpg" alt="">
+    <!-- repeat for seamless loop -->
+    <img src="/static/gta2.jpg" alt="">
+    <img src="/static/gta4.jpg" alt="">
+    <img src="/static/gta5.jpg" alt="">
+  </div>
+
+</div><!-- end .hero-wrapper -->
+
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">Por que usar</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-num">9:16</div>
+    <div class="stat-label">Formato vertical</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">IA</div>
+    <div class="stat-label">Detecta momentos</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">100%</div>
+    <div class="stat-label">Gratuito</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">3x</div>
+    <div class="stat-label">Mais rápido</div>
+  </div>
+</div>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">01</div>
+    <div class="step-text"><strong>Cole o link</strong> de qualquer vídeo do YouTube</div>
+  </div>
+  <div class="step">
+    <div class="step-num">02</div>
+    <div class="step-text"><strong>A IA analisa</strong> e encontra os melhores momentos automaticamente</div>
+  </div>
+  <div class="step">
+    <div class="step-num">03</div>
+    <div class="step-text"><strong>Baixe os clips</strong> em 9:16 prontos para YouTube Shorts, Reels e TikTok</div>
+  </div>
+</div>
+
+<!-- PRICING -->
+<div class="pricing-section">
+  <div class="pricing-header">
+    <h2>ESCOLHA SEU <span>PLANO</span></h2>
+    <p>Comece grátis. Escale quando quiser.</p>
+  </div>
+
+  <div class="pricing-grid">
+
+    <!-- FREE -->
+    <div class="plan">
+      <div class="plan-name">Free</div>
+      <div class="plan-price">
+        <span class="currency">R$</span>
+        <span class="amount">0</span>
+        <span class="period">/mês</span>
+      </div>
+      <p class="plan-desc">Para testar e ver o potencial dos seus clips.</p>
+      <div class="plan-features">
+        <div class="feature"><div class="check">✓</div>3 clips por dia</div>
+        <div class="feature"><div class="check">✓</div>Formato 9:16</div>
+        <div class="feature"><div class="check">✓</div>Até 15 segundos</div>
+        <div class="feature"><div class="check">✓</div>Download em MP4</div>
+      </div>
+      <a href="#" class="btn-plan outline">COMEÇAR GRÁTIS</a>
+    </div>
+
+    <!-- STARTER -->
+    <div class="plan">
+      <div class="plan-name">Starter</div>
+      <div class="plan-price">
+        <span class="currency">R$</span>
+        <span class="amount">47</span>
+        <span class="period">/mês</span>
+      </div>
+      <p class="plan-desc">Para criadores que querem consistência e velocidade.</p>
+      <div class="plan-features">
+        <div class="feature"><div class="check">✓</div>30 clips por dia</div>
+        <div class="feature"><div class="check">✓</div>Formato 9:16</div>
+        <div class="feature"><div class="check">✓</div>Até 30 segundos</div>
+        <div class="feature"><div class="check">✓</div>Download em MP4</div>
+        <div class="feature"><div class="check">✓</div>Fila prioritária</div>
+      </div>
+      <a href="https://pay.kiwify.com.br/T9lEbBR" class="btn-plan outline" target="_blank">ASSINAR AGORA</a>
+    </div>
+
+    <!-- PRO -->
+    <div class="plan popular">
+      <div class="popular-badge">⭐ MAIS POPULAR</div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-price">
+        <span class="currency">R$</span>
+        <span class="amount">97</span>
+        <span class="period">/mês</span>
+      </div>
+      <p class="plan-desc">Para quem leva clipping a sério e quer escalar.</p>
+      <div class="plan-features">
+        <div class="feature"><div class="check">✓</div>Clips ilimitados</div>
+        <div class="feature"><div class="check">✓</div>Formato 9:16</div>
+        <div class="feature"><div class="check">✓</div>Até 60 segundos</div>
+        <div class="feature"><div class="check">✓</div>Download em MP4</div>
+        <div class="feature"><div class="check">✓</div>Fila prioritária</div>
+        <div class="feature"><div class="check">✓</div>Suporte exclusivo</div>
+      </div>
+      <a href="https://pay.kiwify.com.br/oqzGd3k" class="btn-plan filled">ASSINAR AGORA</a>
+    </div>
+
+  </div>
+</div>
+
+<footer>CLIPBOT © 2026 — GERA. POSTA. MONETIZA.</footer>
+
+<script>
+  let pollInterval = null;
+
+  // Animate stars on load
+  document.querySelectorAll('.star').forEach((s, i) => {
+    s.style.opacity = '0.1';
+    setTimeout(() => { s.style.opacity = '1'; s.classList.add('active'); }, 300 + i * 150);
+  });
+
+  async function gerarClips() {
+    const url = document.getElementById('url-input').value.trim();
+    const numClips = document.getElementById('num-clips').value;
+    const clipDuration = document.getElementById('clip-duration').value;
+
+    if (!url) { showError('Cole o link do YouTube primeiro.'); return; }
+
+    hideError();
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('progress-section').style.display = 'block';
+    document.getElementById('btn-gerar').disabled = true;
+    setProgress(5, 'Iniciando...');
+
+    try {
+      const res = await fetch('/api/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, num_clips: numClips, clip_duration: clipDuration })
+      });
+      const data = await res.json();
+      if (data.error) { showError(data.error); resetBtn(); return; }
+      pollStatus(data.job_id);
+    } catch (e) {
+      showError('Erro de conexão. Recarregue a página.');
+      resetBtn();
+    }
+  }
+
+  function pollStatus(jobId) {
+    clearInterval(pollInterval);
+    pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/status/${jobId}`);
+        const data = await res.json();
+        setProgress(data.progress, data.status);
+
+        if (data.status === 'concluido') {
+          clearInterval(pollInterval);
+          showResults(data.clips);
+          resetBtn();
+        } else if (data.status === 'error') {
+          clearInterval(pollInterval);
+          showError(data.error || 'Ocorreu um erro.');
+          resetBtn();
+          document.getElementById('progress-section').style.display = 'none';
+        }
+      } catch (e) {}
+    }, 1500);
+  }
+
+  function setProgress(pct, label) {
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('progress-pct').textContent = pct + '%';
+    document.getElementById('status-text').textContent = label;
+  }
+
+  function showResults(clips) {
+    const grid = document.getElementById('clips-grid');
+    grid.innerHTML = '';
+    clips.forEach(clip => {
+      const card = document.createElement('div');
+      card.className = 'clip-card';
+      card.innerHTML = `
+        <video class="clip-preview" src="${clip.url}" muted loop playsinline
+          onmouseenter="this.play()" onmouseleave="this.pause();this.currentTime=0"></video>
+        <div class="clip-info">
+          <div class="clip-num">CLIP ${clip.number} · ${clip.start}s</div>
+          <a class="btn-download" href="${clip.url}" download="clip${clip.number}.mp4">⬇ BAIXAR</a>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+    document.getElementById('results-section').style.display = 'block';
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('error-box');
+    box.textContent = '⚠ ' + msg;
+    box.style.display = 'block';
+  }
+
+  function hideError() { document.getElementById('error-box').style.display = 'none'; }
+  function resetBtn() { document.getElementById('btn-gerar').disabled = false; }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('url-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') gerarClips();
+    });
+  });
+</script>
+</body>
+</html>

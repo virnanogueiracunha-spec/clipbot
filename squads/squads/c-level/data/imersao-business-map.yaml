@@ -1,0 +1,29 @@
+# IMERSAO BUSINESS MAP — Mapeamento determinístico de fontes por business
+# Resolve discrepancias de nomes entre fontes e slugs de workspace
+# Owner: COO (coo-orchestrator)
+# Usage: Referenciado por tasks etl-deep-pass, etl-local-extract, etl-batch-runner
+
+version: 1
+source_root: "apps/aiox-imersao/recursos"
+
+businesses:
+  # TEMPLATE — duplique este bloco para cada novo business
+  # nome_do_business:
+  #   display_name: "Nome do Business"
+  #   perfil: "perfis/nome-fundador.md"
+  #   formulario: "formulario/Nome Fundador/formulario.md"
+  #   call_vendas: "Calls vendas/Nome Fundador/transcricao.md"
+  #   call_vendas_json: "Calls vendas/Nome Fundador/transcricao.json"
+  #   instalacao: "Instalacao/Nome Fundador/instalacao.md"
+  #   website_hint: null
+  #   call_lines: 0
+  #   data_richness: "BAIXA"  # BAIXA | MEDIA | ALTA
+
+summary:
+  total_businesses: 0
+  with_perfil: 0
+  with_formulario: 0
+  with_call_vendas: 0
+  with_instalacao: 0
+  completed: 0
+  pending: 0
