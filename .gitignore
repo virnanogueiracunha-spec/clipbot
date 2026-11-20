@@ -5,10 +5,13 @@ __pycache__/
 .env
 *.mp4
 
-# AIOX framework (não vai pro deploy)
+# AIOX framework
 .aiox-core/
 .aiox/
 squads/
 docs/
 AGENTS.md
 node_modules/
+
+# Claude Code
+.claude/
